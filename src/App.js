@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import Header from './components/Header';
 import AddContact from './components/AddContact';
 import Contacts from './components/Contacts';
 import Search from './components/Search';
+import personService from './services/persons';
 
 const App = () => {
   const [persons, setPersons] = useState([]);
@@ -12,8 +12,8 @@ const App = () => {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    axios.get('http://localhost:3001/persons').then((response) => {
-      setPersons(response.data);
+    personService.getAll().then((initialData) => {
+      setPersons(initialData);
     });
   }, []);
 
@@ -29,30 +29,49 @@ const App = () => {
 
     const addPerson = {
       name: newName,
-      number: Number(newNumber),
-      id: persons.length + 1,
+      number: newNumber,
     };
+    console.log(addPerson);
     const nameCheck = persons.map((person) => person.name);
-    const numCheck = persons.map((person) => person.number);
-    nameCheck.includes(newName) || numCheck.includes(newNumber)
-      ? alert(`Contact already exists, Change it`)
-      : axios
-          .post('http://localhost:3001/persons', addPerson)
-          .then((response) => {
-            setPersons(persons.concat(addPerson));
-            setName('');
-            setNumber('');
-          });
+    const addNewNumber = {
+      name: newName,
+      number: newNumber,
+    };
+    const id = persons
+      .map((person) => (person.name === newName ? person.id : null))
+      .filter((n) => n != null);
+    // eslint-disable-next-line no-unused-expressions
+    nameCheck.includes(newName)
+      ? window.confirm(
+          `${newName} already exist, replace old number with new one?`
+        )
+        ? personService
+            .replaceNum(id, addNewNumber)
+            .then((numNew) =>
+              setPersons(
+                persons.map((person) =>
+                  person.name !== newName ? person : numNew
+                )
+              )
+            )
+        : null
+      : personService.create(addPerson).then(() => {
+          setPersons(persons.concat(addPerson));
+          setName('');
+          setNumber('');
+        });
   };
-  const handleContactDelete = (id) => {
-    // console.log('delete');
-    axios.delete(`http://localhost:3001/persons/${id}`).then((response) => {
-      setPersons(
-        persons.filter((l) => {
-          return l.id !== id;
+  const handleContactDelete = (id, item) => {
+    // eslint-disable-next-line no-unused-expressions
+    window.confirm(`Delete ${item} from phonebook ?`)
+      ? personService.deleteObj(id).then(() => {
+          setPersons(
+            persons.filter((l) => {
+              return l.id !== id;
+            })
+          );
         })
-      );
-    });
+      : null;
   };
   const handleChange = (e) => {
     setSearch(e.target.value);
@@ -61,6 +80,7 @@ const App = () => {
   const filteredPersons = persons.filter((person) =>
     person.name.toLowerCase().includes(search.toLowerCase())
   );
+  console.log(filteredPersons);
 
   return (
     <>
@@ -83,7 +103,7 @@ const App = () => {
           key={person.id}
           name={person.name}
           number={person.number}
-          handleDelete={() => handleContactDelete(person.id)}
+          handleDelete={() => handleContactDelete(person.id, person.name)}
         />
       ))}
     </>
